@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "SL Bus Finder",
+    "slug": "sl-bus-finder",
+    "scheme": "slbusfinder",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0f172a",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sathsara.slbusfinder",
+      "config": {
+        "googleMapsApiKey": "AIzaSyANQxL6Tyt0Cxn9Xz44j1mjGZnhDZXVKyg"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.sathsara.slbusfinder",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyANQxL6Tyt0Cxn9Xz44j1mjGZnhDZXVKyg"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
