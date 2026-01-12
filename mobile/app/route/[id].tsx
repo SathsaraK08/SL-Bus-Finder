@@ -88,6 +88,17 @@ export default function RouteDetails() {
         return Array.from(unique.values());
     }, [legs]);
 
+    // Prepare legs for Map containing only the subset of stops in order
+    const mapLegs = useMemo(() => {
+        return legs.map(leg => ({
+            route: leg.route,
+            stops: (leg.route.stops || [])
+                .filter(s => s.stop_order >= leg.fromOrder && s.stop_order <= leg.toOrder)
+                .map(s => s.stop!)
+                .filter(Boolean)
+        }));
+    }, [legs]);
+
     const handleShare = async () => {
         try {
             await Share.share({
@@ -102,10 +113,9 @@ export default function RouteDetails() {
         <ScrollView style={styles.container} bounces={false}>
             <StatusBar style="light" />
 
-            {/* Map Section - We use the first leg's route for BusMap geometry for now, 
-                ideally BusMap should handle multiple routes */}
+            {/* Map Section */}
             <View style={styles.mapContainer}>
-                <BusMap route={legs[0].route} stops={mapStops} height={350} />
+                <BusMap legs={mapLegs} stops={mapStops} height={350} />
             </View>
 
             {/* Route Header */}
@@ -149,33 +159,106 @@ export default function RouteDetails() {
 
                 {/* Stops List */}
                 <Text style={styles.sectionTitle}>Journey Timeline</Text>
-                <View style={styles.timeline}>
-                    {allStopsForTimeline.map((stop, index) => (
-                        <View key={`${stop.id}-${index}`} style={styles.timelineItem}>
-                            <View style={styles.timelineLeft}>
-                                <View style={[
-                                    styles.timelineDot,
-                                    index === 0 && styles.dotStart,
-                                    index === allStopsForTimeline.length - 1 && styles.dotEnd,
-                                    stop.legRouteNumber !== allStopsForTimeline[index - 1]?.legRouteNumber && index > 0 && { backgroundColor: colors.accent }
-                                ]} />
-                                {index !== allStopsForTimeline.length - 1 && (
-                                    <View style={styles.timelineLine} />
-                                )}
-                            </View>
-                            <View style={styles.timelineContent}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    <Text style={styles.stopName}>{stop.stop?.name}</Text>
-                                    {isTransfer && index > 0 && stop.legRouteNumber !== allStopsForTimeline[index - 1]?.legRouteNumber && (
-                                        <View style={{ backgroundColor: colors.bgCard, paddingHorizontal: 6, borderRadius: 4 }}>
-                                            <Text style={{ color: colors.accent, fontSize: 10 }}>TRANSFER TO {stop.legRouteNumber}</Text>
-                                        </View>
-                                    )}
+
+                <View style={styles.journeyContainer}>
+                    {legs.map((leg, legIndex) => (
+                        <View key={`leg-${legIndex}`} style={styles.legSection}>
+                            {/* Leg Header */}
+                            <View style={styles.legHeader}>
+                                <View style={[styles.miniRouteBadge, { backgroundColor: legIndex === 0 ? colors.accent : colors.primary }]}>
+                                    <Text style={styles.miniRouteBadgeText}>{leg.route.route_number}</Text>
                                 </View>
-                                {stop.stop?.landmark && (
-                                    <Text style={styles.stopLandmark}>{stop.stop?.landmark}</Text>
-                                )}
+                                <Text style={styles.legHeaderText}>Take Bus {leg.route.route_number} to {leg.to.name}</Text>
                             </View>
+
+                            <View style={styles.timeline}>
+                                {(leg.route.stops || [])
+                                    .filter(s => s.stop_order >= leg.fromOrder && s.stop_order <= leg.toOrder)
+                                    .map((stop, stopIndex, stopArr) => {
+                                        const isFirstInLeg = stopIndex === 0;
+                                        const isLastInLeg = stopIndex === stopArr.length - 1;
+                                        const isOverallStart = legIndex === 0 && isFirstInLeg;
+                                        const isOverallEnd = legIndex === legs.length - 1 && isLastInLeg;
+
+                                        // Detect if this stop is a flexible transfer option
+                                        const isFlexibleHub = leg.alternativeOverlapStops?.some(as => as.id === stop.stop?.id);
+
+                                        return (
+                                            <View key={`${stop.id}-${stopIndex}`} style={styles.timelineItem}>
+                                                <View style={styles.timelineLeft}>
+                                                    <View style={[
+                                                        styles.timelineDot,
+                                                        isOverallStart && styles.dotStart,
+                                                        isOverallEnd && styles.dotEnd,
+                                                        isLastInLeg && !isOverallEnd && styles.dotTransfer,
+                                                        isFlexibleHub && !isOverallStart && !isLastInLeg && styles.dotFlexible
+                                                    ]} />
+                                                    {!isOverallEnd && (
+                                                        <View style={[
+                                                            styles.timelineLine,
+                                                            legIndex > 0 && { backgroundColor: colors.primary + '40' },
+                                                            isFlexibleHub && { backgroundColor: colors.primary }
+                                                        ]} />
+                                                    )}
+                                                </View>
+                                                <View style={styles.timelineContent}>
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Text style={[
+                                                            styles.stopName,
+                                                            (isFirstInLeg || isLastInLeg) && { fontWeight: '700', fontSize: 17 },
+                                                            isFlexibleHub && { color: colors.primary, fontWeight: '600' }
+                                                        ]}>
+                                                            {stop.stop?.name}
+                                                        </Text>
+                                                        {isLastInLeg && !isOverallEnd && (
+                                                            <View style={styles.getOffBadge}>
+                                                                <Text style={styles.getOffText}>PRIMARY TRANSFER</Text>
+                                                            </View>
+                                                        )}
+                                                        {isFlexibleHub && !isFirstInLeg && !isLastInLeg && (
+                                                            <View style={[styles.getOffBadge, { borderColor: colors.primary + '40' }]}>
+                                                                <Text style={[styles.getOffText, { color: colors.primary }]}>FLEXIBLE HUB</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                    {stop.stop?.landmark && (
+                                                        <Text style={styles.stopLandmark}>{stop.stop?.landmark}</Text>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+                            </View>
+
+                            {/* Transfer Card */}
+                            {legIndex < legs.length - 1 && (
+                                <View style={[
+                                    styles.transferCard,
+                                    leg.alternativeOverlapStops && leg.alternativeOverlapStops.length > 1 && styles.flexibleTransferCard
+                                ]}>
+                                    <View style={[
+                                        styles.transferCardIcon,
+                                        leg.alternativeOverlapStops && leg.alternativeOverlapStops.length > 1 && { backgroundColor: colors.primary + '20' }
+                                    ]}>
+                                        <Text style={{ fontSize: 20 }}>{leg.alternativeOverlapStops && leg.alternativeOverlapStops.length > 1 ? '🛡️' : '🔄'}</Text>
+                                    </View>
+                                    <View style={styles.transferCardContent}>
+                                        {leg.alternativeOverlapStops && leg.alternativeOverlapStops.length > 1 ? (
+                                            <>
+                                                <Text style={[styles.transferTitle, { color: colors.primary }]}>Fail-Safe Transfer Zone</Text>
+                                                <Text style={styles.transferSubtitle}>
+                                                    Missed {leg.to.name}? You can still switch to Route {legs[legIndex + 1].route.route_number} at any highlighted hub below.
+                                                </Text>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Text style={styles.transferTitle}>Switch Bus at {leg.to.name}</Text>
+                                                <Text style={styles.transferSubtitle}>Wait for Route {legs[legIndex + 1].route.route_number}</Text>
+                                            </>
+                                        )}
+                                    </View>
+                                </View>
+                            )}
                         </View>
                     ))}
                 </View>
@@ -336,43 +419,146 @@ const styles = StyleSheet.create({
         width: 12,
         height: 12,
         borderRadius: 6,
-        backgroundColor: colors.bgCard,
+        backgroundColor: 'transparent',
         borderWidth: 2,
         borderColor: colors.textMuted,
         marginTop: 6,
+        zIndex: 2,
     },
     dotStart: {
         backgroundColor: colors.success,
         borderColor: colors.success,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        marginLeft: -1,
     },
     dotEnd: {
-        borderColor: '#f43f5e',
-        backgroundColor: '#f43f5e', // Consistent with map red
+        borderColor: colors.danger,
+        backgroundColor: colors.danger,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        marginLeft: -1,
+    },
+    dotTransfer: {
+        backgroundColor: colors.accent,
+        borderColor: colors.accent,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        marginLeft: -1,
     },
     timelineLine: {
-        flex: 1,
+        position: 'absolute',
+        top: 18,
+        bottom: -4,
         width: 2,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        marginVertical: 4,
+        backgroundColor: colors.accent + '40',
+        zIndex: 1,
     },
     timelineContent: {
         flex: 1,
-        paddingBottom: 20,
+        paddingBottom: 24,
     },
     stopName: {
         color: colors.text,
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '500',
     },
     stopLandmark: {
         color: colors.textMuted,
+        fontSize: 12,
+        marginTop: 2,
+    },
+    journeyContainer: {
+        marginTop: 8,
+    },
+    legSection: {
+        marginBottom: 0,
+    },
+    legHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        padding: 12,
+        borderRadius: 12,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    miniRouteBadge: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    miniRouteBadgeText: {
+        color: '#000',
+        fontWeight: '700',
+        fontSize: 14,
+    },
+    legHeaderText: {
+        color: colors.text,
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    getOffBadge: {
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: colors.accent + '40',
+    },
+    getOffText: {
+        color: colors.accent,
+        fontSize: 10,
+        fontWeight: '800',
+    },
+    transferCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(6, 182, 212, 0.05)',
+        padding: 16,
+        borderRadius: 16,
+        marginVertical: 20,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: colors.primary,
+    },
+    transferCardIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 16,
+    },
+    transferCardContent: {
+        flex: 1,
+    },
+    transferTitle: {
+        color: colors.text,
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    transferSubtitle: {
+        color: colors.textMuted,
         fontSize: 13,
         marginTop: 2,
     },
-    stopTime: {
-        color: colors.info,
-        fontSize: 12,
-        marginTop: 4,
-        fontWeight: '500',
+    dotFlexible: {
+        borderColor: colors.primary,
+        backgroundColor: colors.bg,
+        borderWidth: 2,
+    },
+    flexibleTransferCard: {
+        backgroundColor: 'rgba(6, 182, 212, 0.08)',
+        borderColor: colors.primary,
+        borderStyle: 'solid',
     },
 });

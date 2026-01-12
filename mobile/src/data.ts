@@ -56,14 +56,14 @@ export const mockRoutes: BusRoute[] = [
         description: 'Via Sethsiripaya & Thalawathugoda', fare_estimate: 55, estimated_duration_mins: 50, status: 'verified',
         created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         // Borella (4) -> Rajagiriya (13) -> Battaramulla (14) -> Sethsiripaya (31) -> Thalawathugoda (21) -> Kottawa (12)
-        stops: createRouteStops('route-174', ['stop-4', 'stop-13', 'stop-14', 'stop-31', 'stop-21', 'stop-12'], [0, 10, 15, 20, 35, 50]),
+        stops: createRouteStops('route-174', ['stop-4', 'stop-13', 'stop-14', 'stop-31', 'stop-21', 'stop-12'], [0, 10, 15, 20, 30, 45]),
     },
     {
-        id: 'route-171', route_number: '171', route_name: 'Koswatte - Pettah',
-        description: 'Via Rajagiriya', fare_estimate: 50, estimated_duration_mins: 45, status: 'verified',
+        id: 'route-171', route_number: '171', route_name: 'Pettah - Koswatte',
+        description: 'Via Rajagiriya', fare_estimate: 50, estimated_duration_mins: 55, status: 'verified',
         created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-        // Koswatte (32) -> Thalawathugoda (21) -> Sethsiripaya (31) -> Battaramulla (14) -> Rajagiriya (13) -> Borella (4) -> Pettah (2)
-        stops: createRouteStops('route-171', ['stop-32', 'stop-21', 'stop-31', 'stop-14', 'stop-13', 'stop-4', 'stop-2'], [0, 10, 15, 20, 30, 35, 45]),
+        // Pettah (2) -> Borella (4) -> Rajagiriya (13) -> Battaramulla (14) -> Sethsiripaya (31) -> Thalawathugoda (21) -> Koswatte (32)
+        stops: createRouteStops('route-171', ['stop-2', 'stop-4', 'stop-13', 'stop-14', 'stop-31', 'stop-21', 'stop-32'], [0, 12, 22, 27, 32, 42, 52]),
     },
     {
         id: 'route-138', route_number: '138', route_name: 'Maharagama - Pettah',

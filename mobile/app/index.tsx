@@ -44,114 +44,86 @@ const RouteCard = ({ item, onPress }: { item: SearchResult; onPress: () => void 
     const legs = item.legs;
     const isSelected = selectedRoute?.id === item.legs[0].route.id;
 
+    const transferPoint = isTransfer ? legs[0].to.name : null;
+
     return (
         <TouchableOpacity
             style={[styles.routeCard, isSelected && styles.routeCardSelected]}
             onPress={onPress}
         >
-            {legs.map((leg, index) => (
-                <View key={index} style={{ marginBottom: index < legs.length - 1 ? 16 : 0 }}>
-                    {/* Header: Route Number & Name */}
-                    <View style={styles.routeCardHeader}>
-                        <View style={[styles.routeBadge, { backgroundColor: index > 0 ? colors.secondary : colors.accent }]}>
-                            <Ionicons name="bus" size={28} color="#fff" />
-                            <View style={styles.routeNumber}>
-                                <Text style={styles.routeNumberText}>{leg.route.route_number}</Text>
-                            </View>
-                        </View>
-                        <View style={styles.routeInfo}>
-                            <Text style={styles.routeTitle}>{leg.route.route_name}</Text>
-                            <Text style={styles.routeSubtitle}>
-                                {index === 0 ? 'Start' : 'Transfer'}: {leg.from.name}
-                            </Text>
-                        </View>
-                    </View>
-
-                    {/* Stops Visualization */}
-                    <View style={styles.routeStops}>
-                        <View style={styles.stopBadge}>
-                            <View style={[styles.stopDot, { backgroundColor: colors.success }]} />
-                            <Text style={styles.stopText}>{leg.from.name}</Text>
-                        </View>
-                        <View style={styles.routeLine} />
-                        <View style={styles.stopBadge}>
-                            <View style={[styles.stopDot, { backgroundColor: colors.danger }]} />
-                            <Text style={styles.stopText}>{leg.to.name}</Text>
-                        </View>
+            {/* NEW: Journey Header Summary */}
+            <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={styles.routeTitle}>
+                        {isTransfer ? `${legs[0].route.route_number} → ${legs[1].route.route_number}` : `Route ${legs[0].route.route_number}`}
+                    </Text>
+                    <View style={styles.timeBadge}>
+                        <Ionicons name="time" size={12} color={colors.primary} style={{ marginRight: 4 }} />
+                        <Text style={styles.timeBadgeText}>{item.total_time_mins} min</Text>
                     </View>
                 </View>
-            ))}
-
-            {/* Footer: Stats */}
-            <View style={[styles.routeStats, { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }]}>
-                <View style={styles.statItem}>
-                    <Ionicons name="time-outline" style={styles.statIcon} color={colors.textMuted} />
-                    <Text style={styles.statText}>{item.total_time_mins} min</Text>
-                </View>
-                <View style={styles.statItem}>
-                    <Ionicons name="cash-outline" style={styles.statIcon} color={colors.textMuted} />
-                    <Text style={styles.statText}>Rs. {item.total_fare}</Text>
-                </View>
-                {isTransfer ? (
-                    <View style={styles.statItem}>
-                        <Ionicons name="git-compare-outline" style={styles.statIcon} color={colors.warning} />
-                        <Text style={[styles.statText, { color: colors.warning }]}>1 Transfer</Text>
-                    </View>
-                ) : (
-                    <View style={styles.optimizedBadge}>
-                        <Ionicons name="flash" size={12} color={colors.primary} />
-                        <Text style={styles.optimizedText}>RECOMMENDED</Text>
+                {isTransfer && (
+                    <View style={styles.transferSummary}>
+                        <Ionicons name="swap-horizontal" size={14} color={colors.warning} style={{ marginRight: 6 }} />
+                        <Text style={styles.transferSummaryText}>Transfer at <Text style={{ fontWeight: 'bold', color: colors.text }}>{transferPoint}</Text></Text>
                     </View>
                 )}
             </View>
 
-            {isSelected && (
-                <View style={styles.expandedStops}>
-                    <Text style={styles.expandedTitle}>Journey Details:</Text>
-                    {legs.map((leg, lIndex) => {
-                        // Filter the route stops to only those between fromOrder and toOrder
-                        const filteredStops = leg.route.stops?.filter(s =>
-                            s.stop_order >= leg.fromOrder && s.stop_order <= leg.toOrder
-                        ) || [];
-
-                        return (
-                            <View key={lIndex} style={{ marginBottom: 16 }}>
-                                <Text style={[styles.suggestionSubtext, { marginBottom: 8, color: colors.primary, fontWeight: 'bold' }]}>
-                                    Bus {leg.route.route_number}: {leg.from.name} → {leg.to.name}
-                                </Text>
-                                <View style={styles.stopsRow}>
-                                    {filteredStops.map((rs, rsIndex) => (
-                                        <React.Fragment key={rs.id}>
-                                            <View style={[
-                                                styles.stopChip,
-                                                rs.stop_id === leg.from.id && styles.stopChipFrom,
-                                                rs.stop_id === leg.to.id && styles.stopChipTo
-                                            ]}>
-                                                <Text style={[
-                                                    styles.stopChipText,
-                                                    (rs.stop_id === leg.from.id || rs.stop_id === leg.to.id) && styles.stopChipTextHighlight
-                                                ]}>
-                                                    {rs.stop?.name}
-                                                </Text>
-                                            </View>
-                                            {rsIndex < filteredStops.length - 1 && (
-                                                <Text style={{ color: colors.textMuted, alignSelf: 'center' }}>→</Text>
-                                            )}
-                                        </React.Fragment>
-                                    ))}
-                                </View>
+            <View style={styles.journeyVisual}>
+                {legs.map((leg, index) => (
+                    <React.Fragment key={index}>
+                        <View style={styles.compactLeg}>
+                            <View style={[styles.miniRouteBadge, { backgroundColor: index === 0 ? colors.accent : colors.secondary, width: 24, height: 24, borderRadius: 6 }]}>
+                                <Text style={[styles.miniRouteBadgeText, { fontSize: 10 }]}>{leg.route.route_number}</Text>
                             </View>
-                        );
-                    })}
+                            <View style={{ flex: 1, marginLeft: 10 }}>
+                                <Text style={styles.stopText} numberOfLines={1}>{leg.from.name} → {leg.to.name}</Text>
+                            </View>
+                        </View>
+                        {index < legs.length - 1 && (
+                            <View style={styles.visualConnector}>
+                                <View style={styles.connectorLine} />
+                            </View>
+                        )}
+                    </React.Fragment>
+                ))}
+            </View>
 
-                    <TouchableOpacity
-                        style={[styles.searchButton, { paddingVertical: 12, marginTop: 10 }]}
-                        onPress={() => router.push(`/route/${item.id}`)}
-                    >
-                        <Text style={styles.searchButtonText}>View Full Map & Info</Text>
-                    </TouchableOpacity>
+            {/* Footer: Stats */}
+            <View style={[styles.routeStats, { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }]}>
+                <View style={styles.statItem}>
+                    <Ionicons name="cash-outline" style={[styles.statIcon, { fontSize: 16 }]} color={colors.textMuted} />
+                    <Text style={[styles.statText, { fontSize: 13 }]}>Rs. {item.total_fare}</Text>
                 </View>
-            )}
+                {isTransfer ? (
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View style={styles.statItem}>
+                            <Ionicons name="git-compare-outline" style={[styles.statIcon, { fontSize: 16 }]} color={colors.warning} />
+                            <Text style={[styles.statText, { color: colors.warning, fontSize: 13 }]}>1 Change</Text>
+                        </View>
+                        {legs[0].alternativeOverlapStops && legs[0].alternativeOverlapStops.length > 1 && (
+                            <View style={[styles.optimizedBadge, { backgroundColor: colors.primary + '10' }]}>
+                                <Ionicons name="shield-checkmark" size={10} color={colors.primary} />
+                                <Text style={[styles.optimizedText, { fontSize: 10 }]}>FLEXIBLE HUBS</Text>
+                            </View>
+                        )}
+                    </View>
+                ) : (
+                    <View style={styles.optimizedBadge}>
+                        <Ionicons name="star" size={10} color={colors.primary} />
+                        <Text style={[styles.optimizedText, { fontSize: 10 }]}>DIRECT</Text>
+                    </View>
+                )}
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                    onPress={() => router.push(`/route/${item.id}`)}
+                    style={styles.viewDetailsButton}
+                >
+                    <Text style={styles.viewDetailsText}>Details</Text>
+                    <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+                </TouchableOpacity>
+            </View>
         </TouchableOpacity>
     );
 };
@@ -558,6 +530,76 @@ const styles = StyleSheet.create({
         color: colors.textMuted,
         fontSize: 13,
         marginTop: 2,
+    },
+    // New Journey Summary Styles
+    timeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.primary + '15',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    timeBadgeText: {
+        color: colors.primary,
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    transferSummary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.warning + '10',
+        padding: 8,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: colors.warning + '20',
+    },
+    transferSummaryText: {
+        color: colors.textMuted,
+        fontSize: 12,
+    },
+    journeyVisual: {
+        marginBottom: 4,
+    },
+    compactLeg: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    visualConnector: {
+        height: 12,
+        marginLeft: 11, // Center with 24px badge
+        width: 2,
+        borderLeftWidth: 2,
+        borderLeftColor: colors.border,
+        marginVertical: 4,
+    },
+    viewDetailsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    viewDetailsText: {
+        color: colors.primary,
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    miniRouteBadge: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    miniRouteBadgeText: {
+        color: '#000',
+        fontWeight: '700',
+        fontSize: 14,
+    },
+    connectorLine: {
+        flex: 1,
+        width: 2,
+        backgroundColor: colors.border,
     },
     routeStops: {
         flexDirection: 'row',

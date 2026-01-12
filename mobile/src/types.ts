@@ -60,6 +60,7 @@ export interface TripLeg {
     toOrder: number;
     estimated_time_mins: number;
     fare: number;
+    alternativeOverlapStops?: BusStop[];
 }
 
 export interface SearchResult {

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { BusRoute, BusStop, SearchResult } from './types';
 import { mockRoutes, mockStops } from './data';
+import { analyzeJourneyAI } from './lib/ai';
 
 interface AppState {
     searchFrom: string;
@@ -114,7 +115,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
 
         // AI PRE-ANALYSIS
-        const { analyzeJourneyAI } = await import('./lib/ai');
         const aiAdvice = await analyzeJourneyAI(from, to, stops);
         console.log(`AI Strategy: ${aiAdvice.strategy} - ${aiAdvice.logic}`);
 
@@ -180,10 +180,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             if (!transferStopData) continue;
 
             // GEOGRAPHIC HEURISTIC: Is this transfer point totally out of the way?
-            // If distance(Start -> Transfer) + distance(Transfer -> End) > 3x Direct Distance, reject.
+            // Tightened to 1.35x - strictly blocking illogical detours in dense Colombo corridors.
             const dist1 = getDist(avgStart.lat, avgStart.lon, transferStopData.latitude, transferStopData.longitude);
             const dist2 = getDist(transferStopData.latitude, transferStopData.longitude, avgEnd.lat, avgEnd.lon);
-            if (dist1 + dist2 > directAirDist * 2.5) continue;
+            if (dist1 + dist2 > directAirDist * 1.35) continue;
 
             const connectingRoutes = routesThroughStop[transferStopId] || [];
             for (const connection of connectingRoutes) {
@@ -201,33 +201,63 @@ export const useAppStore = create<AppState>((set, get) => ({
                         const time1 = (leg1.endStop.estimated_time_from_start_mins || 0) - (leg1.startStop.estimated_time_from_start_mins || 0);
                         const time2 = (end.estimated_time_from_start_mins || 0) - (leg2Start.estimated_time_from_start_mins || 0);
 
-                        results.push({
-                            id: `transfer-${leg1.route.id}-${leg2Route.id}`,
-                            type: 'transfer',
-                            transferCount: 1,
-                            total_time_mins: time1 + time2 + 15, // +15 mins transfer overhead
-                            total_fare: (leg1.route.fare_estimate || 50) + (leg2Route.fare_estimate || 50),
-                            legs: [
-                                {
-                                    route: leg1.route,
-                                    from: fromStop,
-                                    to: transferStop,
-                                    fromOrder: leg1.startStop.stop_order,
-                                    toOrder: leg1.endStop.stop_order,
-                                    estimated_time_mins: time1,
-                                    fare: leg1.route.fare_estimate || 50
-                                },
-                                {
-                                    route: leg2Route,
-                                    from: transferStop,
-                                    to: toStop,
-                                    fromOrder: leg2Start.stop_order,
-                                    toOrder: end.stop_order,
-                                    estimated_time_mins: time2,
-                                    fare: leg2Route.fare_estimate || 50
+                        // FIND ALL COMMON STOPS (TRANSFER ZONE)
+                        // This finds all stops shared by both routes that are valid transfer points
+                        const allCommonStops = (leg1.route.stops || [])
+                            .filter(s1 => s1.stop_order >= leg1.startStop.stop_order)
+                            .filter(s1 => (leg2Route.stops || []).some(s2 =>
+                                s2.stop_id === s1.stop_id && s2.stop_order < end.stop_order
+                            ))
+                            .map(rs => rs.stop!)
+                            .filter(Boolean);
+
+                        const existing = results.find(r =>
+                            r.legs[0]?.route.id === leg1.route.id &&
+                            r.legs[1]?.route.id === leg2Route.id
+                        );
+
+                        if (existing) {
+                            // Update primary if this one is faster? 
+                            // For now, just ensure all common stops are collected
+                            const seenIds = new Set(existing.legs[0].alternativeOverlapStops?.map(s => s.id));
+                            allCommonStops.forEach(s => {
+                                if (!seenIds.has(s.id)) {
+                                    existing.legs[0].alternativeOverlapStops = [
+                                        ...(existing.legs[0].alternativeOverlapStops || []),
+                                        s
+                                    ];
                                 }
-                            ]
-                        });
+                            });
+                        } else {
+                            results.push({
+                                id: `transfer-${leg1.route.id}-${leg2Route.id}`,
+                                type: 'transfer',
+                                transferCount: 1,
+                                total_time_mins: time1 + time2 + 15, // +15 mins transfer overhead
+                                total_fare: (leg1.route.fare_estimate || 50) + (leg2Route.fare_estimate || 50),
+                                legs: [
+                                    {
+                                        route: leg1.route,
+                                        from: fromStop,
+                                        to: transferStop,
+                                        fromOrder: leg1.startStop.stop_order,
+                                        toOrder: leg1.endStop.stop_order,
+                                        estimated_time_mins: time1,
+                                        fare: leg1.route.fare_estimate || 50,
+                                        alternativeOverlapStops: allCommonStops
+                                    },
+                                    {
+                                        route: leg2Route,
+                                        from: transferStop,
+                                        to: toStop,
+                                        fromOrder: leg2Start.stop_order,
+                                        toOrder: end.stop_order,
+                                        estimated_time_mins: time2,
+                                        fare: leg2Route.fare_estimate || 50
+                                    }
+                                ]
+                            });
+                        }
                     }
                 }
             }
@@ -244,22 +274,27 @@ export const useAppStore = create<AppState>((set, get) => ({
                 filteredResults = results.filter(r => r.type === 'direct' || r.total_time_mins < (results.find(x => x.type === 'direct')?.total_time_mins || 999) - 10);
             }
         } else if (aiAdvice.strategy === 'transfer_required' && aiAdvice.preferredTransferPoints) {
-            // Check if transfer point matches preferred ones
-            filteredResults = results.filter(r => {
-                if (r.type === 'direct') return true;
-                const transferStopName = r.legs[1]?.from.name;
-                return (aiAdvice.preferredTransferPoints as string[]).some(p => transferStopName.includes(p));
+            // Reward transfers at preferred hubs, penalize others heavily
+            results.forEach(r => {
+                if (r.type === 'transfer') {
+                    const stopName = r.legs[1]?.from.name.toLowerCase();
+                    const isPreferred = (aiAdvice.preferredTransferPoints as string[]).some(p => stopName.includes(p.toLowerCase()));
+                    if (isPreferred) {
+                        r.total_time_mins -= 20; // 20 min "Reliability Bonus" for suggested hubs (Borella, Sethsiripaya)
+                    } else {
+                        r.total_time_mins += 90; // 90 min "Detour Penalty" for going via Pettah/Fort for inland trips
+                    }
+                }
             });
-
-            // If we filtered EVERYTHING out (AI too strict?), revert to original results but ranked lower
-            if (filteredResults.length === 0) filteredResults = results;
         }
 
-        // Final Sort by Score (Direct is king, time is secondary)
+        // Final Sort: Direct is King, Transfer Hub Quality is Queen
         filteredResults.sort((a, b) => {
-            const scoreA = a.total_time_mins + (a.type === 'transfer' ? 30 : 0);
-            const scoreB = b.total_time_mins + (b.type === 'transfer' ? 30 : 0);
-            return scoreA - scoreB;
+            // Direct matches always first
+            if (a.type !== b.type) return a.type === 'direct' ? -1 : 1;
+
+            // For transfers, trust our AI-informed scoring (total_time includes bonuses/penalties)
+            return a.total_time_mins - b.total_time_mins;
         });
 
         const uniqueResults = filteredResults.filter((value, index, self) =>

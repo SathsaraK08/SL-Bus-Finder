@@ -4,12 +4,15 @@ import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { BusRoute, BusStop } from '../types';
 
 interface MapProps {
-    route?: BusRoute;
-    stops: BusStop[];
+    legs?: {
+        route: BusRoute;
+        stops: BusStop[]; // Stops specific to this leg in order
+    }[];
+    stops: BusStop[]; // All relevant stops for markers
     height?: number;
 }
 
-export default function BusMap({ route, stops, height = 300 }: MapProps) {
+export default function BusMap({ legs, stops, height = 300 }: MapProps) {
     const mapRef = useRef<MapView>(null);
 
     // Calculate region to fit all stops
@@ -25,7 +28,7 @@ export default function BusMap({ route, stops, height = 300 }: MapProps) {
                 animated: true,
             });
         }
-    }, [stops, route]);
+    }, [stops, legs]);
 
     // If no stops, default to Colombo center
     const initialRegion = {
@@ -45,26 +48,31 @@ export default function BusMap({ route, stops, height = 300 }: MapProps) {
                 showsUserLocation
                 showsMyLocationButton
             >
-                {/* Draw Route Path */}
-                {route && stops.length > 1 && (
+                {/* Draw Route Paths for each leg */}
+                {legs && legs.map((leg, index) => (
                     <Polyline
-                        coordinates={stops.map(s => ({ latitude: s.latitude, longitude: s.longitude }))}
-                        strokeColor="#06b6d4" // Primary cyan color
-                        strokeWidth={4}
-                        lineDashPattern={[1]}
-                    />
-                )}
-
-                {/* Draw Stops */}
-                {stops.map((stop, index) => (
-                    <Marker
-                        key={stop.id}
-                        coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
-                        title={stop.name}
-                        description={stop.landmark}
-                        pinColor={index === 0 ? 'green' : index === stops.length - 1 ? 'red' : '#06b6d4'}
+                        key={`poly-${index}`}
+                        coordinates={leg.stops.map(s => ({ latitude: s.latitude, longitude: s.longitude }))}
+                        strokeColor={index === 0 ? "#06b6d4" : "#8b5cf6"} // Alternate colors for legs
+                        strokeWidth={5}
+                        lineDashPattern={index === 0 ? undefined : [5, 2]} // Dash second leg?
                     />
                 ))}
+
+                {/* Draw Stops */}
+                {stops.map((stop, index) => {
+                    const isTransferHub = legs && legs.length > 1 && legs[0].stops[legs[0].stops.length - 1].id === stop.id;
+
+                    return (
+                        <Marker
+                            key={`${stop.id}-${index}`}
+                            coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
+                            title={stop.name}
+                            description={stop.landmark}
+                            pinColor={index === 0 ? 'green' : index === stops.length - 1 ? 'red' : isTransferHub ? 'orange' : '#06b6d4'}
+                        />
+                    );
+                })}
             </MapView>
         </View>
     );
