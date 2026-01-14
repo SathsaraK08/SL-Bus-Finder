@@ -113,11 +113,12 @@ export default function ContributeScreen() {
                         style={[styles.submitButton, { backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.primary }]}
                         onPress={async () => {
                             try {
-                                const { seedDatabase } = require('../src/lib/seed');
+                                const { seedDatabase } = await import('../src/lib/seed');
                                 await seedDatabase();
                                 Alert.alert('Success', 'Database seeded with initial data!');
-                            } catch (e: any) {
-                                Alert.alert('Error', e.message);
+                            } catch (e) {
+                                const message = e instanceof Error ? e.message : 'An unknown error occurred';
+                                Alert.alert('Error', message);
                             }
                         }}
                     >

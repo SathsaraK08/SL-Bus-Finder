@@ -53,10 +53,15 @@ export const analyzeJourneyAI = async (from: string, to: string, allStops: BusSt
         const jsonMatch = text.match(/\{[\s\S]*\}/);
 
         if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
+            const data = JSON.parse(jsonMatch[0]);
+            return {
+                strategy: data.strategy || 'standard',
+                logic: data.logic || 'Search based on geography',
+                preferredTransferPoints: data.preferredTransferPoints || []
+            };
         }
-    } catch (err) {
-        console.warn('AI failed, using default standard search.');
+    } catch {
+        return { strategy: 'standard', logic: 'Search based on geography (AI Offline)' };
     }
 
     return { strategy: 'standard', logic: 'Search based on geography' };

@@ -27,12 +27,12 @@ export default function AutocompleteInput({
     iconColor,
     icon,
 }: AutocompleteInputProps) {
-    const [focused, setFocused] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
     const [suggestions, setSuggestions] = useState<BusStop[]>([]);
     const [loading, setLoading] = useState(false);
 
     // Debounce logic
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         // If value is cleared, clear suggestions
@@ -42,7 +42,7 @@ export default function AutocompleteInput({
         }
 
         // Only search if focused
-        if (!focused) return;
+        if (!isFocused) return;
 
         // Clear previous timeout
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -70,18 +70,18 @@ export default function AutocompleteInput({
         return () => {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [value, focused]);
+    }, [value, isFocused]);
 
     const handleSelect = (stop: BusStop) => {
         onChangeText(stop.name);
         setSuggestions([]);
-        setFocused(false);
+        setIsFocused(false);
         Keyboard.dismiss();
     };
 
     return (
         <View style={styles.inputContainer}>
-            <View style={[styles.inputWrapper, focused && styles.inputFocused]}>
+            <View style={[styles.inputWrapper, isFocused && styles.inputFocused]}>
                 <View style={[styles.inputIcon, { backgroundColor: iconColor }]}>
                     <Text style={styles.inputIconText}>{icon}</Text>
                 </View>
@@ -91,23 +91,16 @@ export default function AutocompleteInput({
                     placeholderTextColor={colors.textMuted}
                     value={value}
                     onChangeText={onChangeText}
-                    onFocus={() => {
-                        setFocused(true);
-                        // Trigger search again if value exists
-                        if (value.length >= 2) {
-                            // Force trigger could be complex with effect deps, 
-                            // but effect depends on `focused` so it works.
-                        }
-                    }}
+                    onFocus={() => setIsFocused(true)}
                     onBlur={() => {
                         // Delay hide so click registers
-                        setTimeout(() => setFocused(false), 200);
+                        setTimeout(() => setIsFocused(false), 200);
                     }}
                 />
                 {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />}
             </View>
 
-            {suggestions.length > 0 && focused && (
+            {suggestions.length > 0 && isFocused && (
                 <View style={styles.suggestionsContainer}>
                     {suggestions.map((stop) => (
                         <TouchableOpacity

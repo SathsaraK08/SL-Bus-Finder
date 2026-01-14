@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
 import { mockRoutes, mockStops } from '../data';
-import { Alert } from 'react-native';
 
 export const seedDatabase = async () => {
     try {
@@ -128,7 +127,7 @@ export const seedDatabase = async () => {
 
         console.log('Seed process completed!');
         return true;
-    } catch (error: any) {
+    } catch (error) {
         console.error('Seed error:', error);
         throw error;
     }

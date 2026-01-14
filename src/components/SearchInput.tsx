@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Search, MapPin } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { BusStop } from '@/lib/types';
@@ -14,26 +14,22 @@ interface SearchInputProps {
 
 export function SearchInput({ placeholder, value, onChange, icon }: SearchInputProps) {
     const [isFocused, setIsFocused] = useState(false);
-    const [suggestions, setSuggestions] = useState<BusStop[]>([]);
     const inputRef = useRef<HTMLInputElement>(null);
     const { stops } = useAppStore();
 
-    useEffect(() => {
+    const suggestions = useMemo(() => {
         if (value.length > 1) {
-            const filtered = stops.filter(
+            return stops.filter(
                 (stop) =>
                     stop.name.toLowerCase().includes(value.toLowerCase()) ||
                     stop.landmark?.toLowerCase().includes(value.toLowerCase())
-            );
-            setSuggestions(filtered.slice(0, 5));
-        } else {
-            setSuggestions([]);
+            ).slice(0, 5);
         }
+        return [];
     }, [value, stops]);
 
     const handleSelect = (stop: BusStop) => {
         onChange(stop.name);
-        setSuggestions([]);
         setIsFocused(false);
     };
 
@@ -41,14 +37,14 @@ export function SearchInput({ placeholder, value, onChange, icon }: SearchInputP
         <div className="relative w-full">
             <div
                 className={`flex items-center gap-3 bg-white/10 backdrop-blur-md rounded-2xl px-4 py-4 border transition-all duration-300 ${isFocused
-                        ? 'border-cyan-400 shadow-lg shadow-cyan-500/20'
-                        : 'border-white/20 hover:border-white/40'
+                    ? 'border-cyan-400 shadow-lg shadow-cyan-500/20'
+                    : 'border-white/20 hover:border-white/40'
                     }`}
             >
                 <div
                     className={`p-2 rounded-full ${icon === 'from'
-                            ? 'bg-gradient-to-br from-emerald-400 to-green-500'
-                            : 'bg-gradient-to-br from-rose-400 to-red-500'
+                        ? 'bg-gradient-to-br from-emerald-400 to-green-500'
+                        : 'bg-gradient-to-br from-rose-400 to-red-500'
                         }`}
                 >
                     {icon === 'from' ? (

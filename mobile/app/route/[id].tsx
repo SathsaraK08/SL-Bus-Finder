@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Share } from 'react-native';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { useAppStore } from '../../src/store';
-import { BusStop, SearchResult } from '../../src/types';
+import { BusStop } from '../../src/types';
 import BusMap from '../../src/components/BusMap';
 import { StatusBar } from 'expo-status-bar';
 
@@ -21,7 +21,7 @@ const colors = {
 };
 
 export default function RouteDetails() {
-    const { id } = useLocalSearchParams();
+    const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const navigation = useNavigation();
     const { routes, searchResults } = useAppStore();
@@ -44,38 +44,28 @@ export default function RouteDetails() {
         });
     }, [navigation, displayTitle]);
 
-    if (!searchResult && !baseRoute) {
-        return (
-            <View style={styles.container}>
-                <Text style={styles.errorText}>Route Not Found</Text>
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-                    <Text style={styles.backButtonText}>Go Back</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
-
     // Normalized legs for rendering
-    const legs = searchResult ? searchResult.legs : (baseRoute ? [{
-        route: baseRoute,
-        from: baseRoute.stops?.[0]?.stop!,
-        to: baseRoute.stops?.[baseRoute.stops.length - 1]?.stop!,
-        fromOrder: baseRoute.stops?.[0]?.stop_order!,
-        toOrder: baseRoute.stops?.[baseRoute.stops.length - 1]?.stop_order!,
-        estimated_time_mins: baseRoute.estimated_duration_mins || 0,
-        fare: baseRoute.fare_estimate || 0
-    }] : []);
+    const legs = useMemo(() => {
+        if (searchResult) return searchResult.legs;
+        if (baseRoute && baseRoute.stops && baseRoute.stops.length > 0) {
+            const firstRS = baseRoute.stops[0];
+            const lastRS = baseRoute.stops[baseRoute.stops.length - 1];
 
-    // Calculate totals for stats
-    const totalFare = searchResult ? searchResult.total_fare : (baseRoute?.fare_estimate || 0);
-    const totalTime = searchResult ? searchResult.total_time_mins : (baseRoute?.estimated_duration_mins || 0);
-
-    // Aggregate ALL stops from ALL legs for the timeline, in order
-    const allStopsForTimeline = legs.flatMap(leg => {
-        return (leg.route.stops || [])
-            .filter(s => s.stop_order >= leg.fromOrder && s.stop_order <= leg.toOrder)
-            .map(s => ({ ...s, legRouteNumber: leg.route.route_number }));
-    });
+            if (firstRS.stop && lastRS.stop) {
+                return [{
+                    route: baseRoute,
+                    from: firstRS.stop,
+                    to: lastRS.stop,
+                    fromOrder: firstRS.stop_order,
+                    toOrder: lastRS.stop_order,
+                    estimated_time_mins: baseRoute.estimated_duration_mins || 0,
+                    fare: baseRoute.fare_estimate || 0,
+                    alternativeOverlapStops: []
+                }];
+            }
+        }
+        return [];
+    }, [searchResult, baseRoute]);
 
     // Map stops needs all physical stops from all routes involved
     const mapStops = useMemo(() => {
@@ -94,10 +84,25 @@ export default function RouteDetails() {
             route: leg.route,
             stops: (leg.route.stops || [])
                 .filter(s => s.stop_order >= leg.fromOrder && s.stop_order <= leg.toOrder)
-                .map(s => s.stop!)
+                .map(s => s.stop as BusStop)
                 .filter(Boolean)
         }));
     }, [legs]);
+
+    if (!searchResult && !baseRoute) {
+        return (
+            <View style={styles.container}>
+                <Text style={styles.errorText}>Route Not Found</Text>
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <Text style={styles.backButtonText}>Back to Search</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    // Calculate totals for stats
+    const totalFare = searchResult ? searchResult.total_fare : (baseRoute?.fare_estimate || 0);
+    const totalTime = searchResult ? searchResult.total_time_mins : (baseRoute?.estimated_duration_mins || 0);
 
     const handleShare = async () => {
         try {
@@ -108,6 +113,8 @@ export default function RouteDetails() {
             console.error(error);
         }
     };
+
+    if (legs.length === 0) return null;
 
     return (
         <ScrollView style={styles.container} bounces={false}>
@@ -148,7 +155,7 @@ export default function RouteDetails() {
                     </View>
                     <View style={styles.statCard}>
                         <Text style={styles.statIcon}>📍</Text>
-                        <Text style={styles.statValue}>{allStopsForTimeline.length}</Text>
+                        <Text style={styles.statValue}>{legs.reduce((acc, l) => acc + (l.route.stops?.length || 0), 0)}</Text>
                         <Text style={styles.statLabel}>Stops</Text>
                     </View>
                 </View>
@@ -157,13 +164,12 @@ export default function RouteDetails() {
                     <Text style={styles.shareButtonText}>Share Journey 📤</Text>
                 </TouchableOpacity>
 
-                {/* Stops List */}
+                {/* Journey Timeline */}
                 <Text style={styles.sectionTitle}>Journey Timeline</Text>
 
                 <View style={styles.journeyContainer}>
                     {legs.map((leg, legIndex) => (
                         <View key={`leg-${legIndex}`} style={styles.legSection}>
-                            {/* Leg Header */}
                             <View style={styles.legHeader}>
                                 <View style={[styles.miniRouteBadge, { backgroundColor: legIndex === 0 ? colors.accent : colors.primary }]}>
                                     <Text style={styles.miniRouteBadgeText}>{leg.route.route_number}</Text>
@@ -179,25 +185,22 @@ export default function RouteDetails() {
                                         const isLastInLeg = stopIndex === stopArr.length - 1;
                                         const isOverallStart = legIndex === 0 && isFirstInLeg;
                                         const isOverallEnd = legIndex === legs.length - 1 && isLastInLeg;
-
-                                        // Detect if this stop is a flexible transfer option
                                         const isFlexibleHub = leg.alternativeOverlapStops?.some(as => as.id === stop.stop?.id);
 
                                         return (
-                                            <View key={`${stop.id}-${stopIndex}`} style={styles.timelineItem}>
+                                            <View key={`${stop.stop?.id || stop.id}-${stopIndex}`} style={styles.timelineItem}>
                                                 <View style={styles.timelineLeft}>
                                                     <View style={[
                                                         styles.timelineDot,
                                                         isOverallStart && styles.dotStart,
                                                         isOverallEnd && styles.dotEnd,
                                                         isLastInLeg && !isOverallEnd && styles.dotTransfer,
-                                                        isFlexibleHub && !isOverallStart && !isLastInLeg && styles.dotFlexible
+                                                        isFlexibleHub && !isOverallStart && styles.dotFlexible
                                                     ]} />
                                                     {!isOverallEnd && (
                                                         <View style={[
                                                             styles.timelineLine,
-                                                            legIndex > 0 && { backgroundColor: colors.primary + '40' },
-                                                            isFlexibleHub && { backgroundColor: colors.primary }
+                                                            legIndex > 0 && { backgroundColor: colors.primary + '40' }
                                                         ]} />
                                                     )}
                                                 </View>
@@ -206,18 +209,13 @@ export default function RouteDetails() {
                                                         <Text style={[
                                                             styles.stopName,
                                                             (isFirstInLeg || isLastInLeg) && { fontWeight: '700', fontSize: 17 },
-                                                            isFlexibleHub && { color: colors.primary, fontWeight: '600' }
+                                                            isFlexibleHub && { color: colors.primary }
                                                         ]}>
                                                             {stop.stop?.name}
                                                         </Text>
                                                         {isLastInLeg && !isOverallEnd && (
                                                             <View style={styles.getOffBadge}>
-                                                                <Text style={styles.getOffText}>PRIMARY TRANSFER</Text>
-                                                            </View>
-                                                        )}
-                                                        {isFlexibleHub && !isFirstInLeg && !isLastInLeg && (
-                                                            <View style={[styles.getOffBadge, { borderColor: colors.primary + '40' }]}>
-                                                                <Text style={[styles.getOffText, { color: colors.primary }]}>FLEXIBLE HUB</Text>
+                                                                <Text style={styles.getOffText}>TRANSFER HUB</Text>
                                                             </View>
                                                         )}
                                                     </View>
@@ -230,32 +228,14 @@ export default function RouteDetails() {
                                     })}
                             </View>
 
-                            {/* Transfer Card */}
                             {legIndex < legs.length - 1 && (
-                                <View style={[
-                                    styles.transferCard,
-                                    leg.alternativeOverlapStops && leg.alternativeOverlapStops.length > 1 && styles.flexibleTransferCard
-                                ]}>
-                                    <View style={[
-                                        styles.transferCardIcon,
-                                        leg.alternativeOverlapStops && leg.alternativeOverlapStops.length > 1 && { backgroundColor: colors.primary + '20' }
-                                    ]}>
-                                        <Text style={{ fontSize: 20 }}>{leg.alternativeOverlapStops && leg.alternativeOverlapStops.length > 1 ? '🛡️' : '🔄'}</Text>
+                                <View style={styles.transferCard}>
+                                    <View style={styles.transferCardIcon}>
+                                        <Text style={{ fontSize: 20 }}>🔄</Text>
                                     </View>
                                     <View style={styles.transferCardContent}>
-                                        {leg.alternativeOverlapStops && leg.alternativeOverlapStops.length > 1 ? (
-                                            <>
-                                                <Text style={[styles.transferTitle, { color: colors.primary }]}>Fail-Safe Transfer Zone</Text>
-                                                <Text style={styles.transferSubtitle}>
-                                                    Missed {leg.to.name}? You can still switch to Route {legs[legIndex + 1].route.route_number} at any highlighted hub below.
-                                                </Text>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Text style={styles.transferTitle}>Switch Bus at {leg.to.name}</Text>
-                                                <Text style={styles.transferSubtitle}>Wait for Route {legs[legIndex + 1].route.route_number}</Text>
-                                            </>
-                                        )}
+                                        <Text style={styles.transferTitle}>Switch Bus at {leg.to.name}</Text>
+                                        <Text style={styles.transferSubtitle}>Wait for Route {legs[legIndex + 1].route.route_number}</Text>
                                     </View>
                                 </View>
                             )}
@@ -263,9 +243,8 @@ export default function RouteDetails() {
                     ))}
                 </View>
 
-                {/* Report Issue Section */}
+                {/* Report Issue */}
                 <View style={{ marginTop: 30, paddingBottom: 40, alignItems: 'center' }}>
-                    <Text style={{ color: colors.textMuted, marginBottom: 12 }}>See something wrong?</Text>
                     <TouchableOpacity
                         style={{
                             flexDirection: 'row',
@@ -279,7 +258,7 @@ export default function RouteDetails() {
                         }}
                         onPress={() => router.push({ pathname: '/report', params: { routeId: legs[0].route.id, routeName: legs[0].route.route_number } })}
                     >
-                        <Text style={{ color: colors.danger, fontWeight: '600', marginRight: 8 }}>⚠️ Report Issue</Text>
+                        <Text style={{ color: colors.danger, fontWeight: '600' }}>⚠️ Report Issue</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -555,10 +534,5 @@ const styles = StyleSheet.create({
         borderColor: colors.primary,
         backgroundColor: colors.bg,
         borderWidth: 2,
-    },
-    flexibleTransferCard: {
-        backgroundColor: 'rgba(6, 182, 212, 0.08)',
-        borderColor: colors.primary,
-        borderStyle: 'solid',
     },
 });

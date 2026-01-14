@@ -76,8 +76,9 @@ export default function ReportScreen() {
             Alert.alert('Thank You!', 'Your report has been submitted for review. An AI agent is checking it now!', [
                 { text: 'OK', onPress: () => router.back() }
             ]);
-        } catch (error: any) {
-            Alert.alert('Error', error.message);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'An unknown error occurred';
+            Alert.alert('Error', message);
         } finally {
             setLoading(false);
         }
@@ -96,7 +97,7 @@ export default function ReportScreen() {
 
             <View style={styles.form}>
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>What's wrong?</Text>
+                    <Text style={styles.label}>What{"'"}s wrong?</Text>
                     <View style={styles.typeSelector}>
                         <TouchableOpacity
                             style={[styles.typeButton, type === 'correction' && styles.typeButtonActive]}

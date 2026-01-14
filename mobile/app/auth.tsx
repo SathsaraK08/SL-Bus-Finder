@@ -46,8 +46,9 @@ export default function AuthScreen() {
                 if (error) throw error;
                 router.replace('/'); // Go to home on success
             }
-        } catch (error: any) {
-            Alert.alert('Error', error.message);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'An unknown error occurred';
+            Alert.alert('Error', message);
         } finally {
             setLoading(false);
         }
@@ -111,7 +112,7 @@ export default function AuthScreen() {
                         onPress={() => setIsSignUp(!isSignUp)}
                     >
                         <Text style={styles.switchText}>
-                            {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                            {isSignUp ? 'Already have an account? Sign In' : `Don't have an account? Sign Up`}
                         </Text>
                     </TouchableOpacity>
                 </View>

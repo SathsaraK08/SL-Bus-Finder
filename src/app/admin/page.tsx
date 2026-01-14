@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BusRoute, BusStop } from '@/lib/types';
 import {
     Bus,
     MapPin,
@@ -24,7 +23,6 @@ export default function AdminDashboard() {
         pendingVerifications: 0,
         totalContributions: 0
     });
-    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         async function fetchStats() {
@@ -42,8 +40,6 @@ export default function AdminDashboard() {
                 });
             } catch (error) {
                 console.error('Error fetching admin stats:', error);
-            } finally {
-                setIsLoading(false);
             }
         }
 

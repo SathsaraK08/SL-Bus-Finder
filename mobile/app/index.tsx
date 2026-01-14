@@ -1,17 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
     StyleSheet,
     Text,
     View,
-    TextInput,
     TouchableOpacity,
     FlatList,
     Keyboard,
-    Dimensions,
 } from 'react-native';
 import { useAppStore } from '../src/store';
-import { mockStops } from '../src/data';
-import { BusStop, SearchResult } from '../src/types';
+import { SearchResult } from '../src/types';
 import { useRouter } from 'expo-router';
 import AutocompleteInput from '../src/components/AutocompleteInput';
 
@@ -148,7 +145,7 @@ export default function Home() {
     // Load data on startup
     React.useEffect(() => {
         initializeData();
-    }, []);
+    }, [initializeData]);
 
     const handleSearch = useCallback(() => {
         if (searchFrom && searchTo) {

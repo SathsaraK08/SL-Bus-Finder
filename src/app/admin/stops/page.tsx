@@ -96,7 +96,7 @@ export default function StopManagement() {
                     </div>
                 ) : filteredStops.length === 0 ? (
                     <div className="col-span-full py-20 text-center bg-slate-900/30 border border-slate-800 border-dashed rounded-2xl">
-                        <p className="text-slate-400">No stops found matching "{searchTerm}"</p>
+                        <p className="text-slate-400">No stops found matching &quot;{searchTerm}&quot;</p>
                     </div>
                 ) : (
                     filteredStops.map((stop) => (

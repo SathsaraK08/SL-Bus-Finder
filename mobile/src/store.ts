@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { BusRoute, BusStop, SearchResult } from './types';
-import { mockRoutes, mockStops } from './data';
+import { BusRoute, BusStop, SearchResult, RouteStop } from './types';
 import { analyzeJourneyAI } from './lib/ai';
 
 interface AppState {
@@ -45,16 +44,16 @@ export const useAppStore = create<AppState>((set, get) => ({
 
             if (routesRes.data && stopsRes.data) {
                 const stops = stopsRes.data as BusStop[];
-                // IMPORTANT: Sort stops by order AND link the actual Stop object
-                const routes = routesRes.data.map((r: any) => ({
+
+                const routes = routesRes.data.map((r: BusRoute) => ({
                     ...r,
                     stops: (r.stops || [])
-                        .sort((a: any, b: any) => a.stop_order - b.stop_order)
-                        .map((rs: any) => ({
+                        .sort((a: RouteStop, b: RouteStop) => a.stop_order - b.stop_order)
+                        .map((rs: RouteStop) => ({
                             ...rs,
                             stop: stops.find(s => s.id === rs.stop_id)
                         }))
-                }));
+                })) as BusRoute[];
 
                 set({ routes, stops });
                 console.log(`✅ Loaded ${routes.length} routes and ${stops.length} stops.`);
@@ -157,13 +156,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
 
         // 2. TRANSFER ROUTES (1 Transfer)
-        const routesThroughStop: Record<string, { route: BusRoute, stop: any }[]> = {};
+        const routesThroughStop: Record<string, { route: BusRoute, stop: RouteStop }[]> = {};
         routes.forEach(r => r.stops?.forEach(s => {
             if (!routesThroughStop[s.stop_id]) routesThroughStop[s.stop_id] = [];
             routesThroughStop[s.stop_id].push({ route: r, stop: s });
         }));
 
-        const potentialLeg1: { route: BusRoute, startStop: any, endStop: any }[] = [];
+        const potentialLeg1: { route: BusRoute, startStop: RouteStop, endStop: RouteStop }[] = [];
         for (const route of routes) {
             if (!route.stops) continue;
             const myStarts = route.stops.filter(rs => startStops.some(s => s.id === rs.stop_id));

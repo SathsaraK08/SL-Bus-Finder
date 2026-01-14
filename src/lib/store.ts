@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { BusRoute, BusStop, SearchResult, User } from './types';
-import { mockRoutes, mockStops } from './mock-data';
+import { BusRoute, BusStop, SearchResult, User, RouteStop } from './types';
 
 interface AppState {
     // User state
@@ -29,6 +28,7 @@ interface AppState {
 
     // Search function
     searchRoutes: (from: string, to: string) => void;
+    initializeData: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -51,10 +51,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     setSelectedRoute: (route) => set({ selectedRoute: route }),
 
     // Data
-    routes: mockRoutes,
-    stops: mockStops,
+    routes: [],
+    stops: [],
     setRoutes: (routes) => set({ routes }),
     setStops: (stops) => set({ stops }),
+
+    initializeData: async () => {
+        try {
+            const { supabase } = await import('./supabase');
+            const [routesRes, stopsRes] = await Promise.all([
+                supabase.from('routes').select(`*, stops:route_stops(*)`),
+                supabase.from('stops').select('*')
+            ]);
+
+            if (routesRes.data && stopsRes.data) {
+                const stops = stopsRes.data as BusStop[];
+                const routes = routesRes.data.map((r: BusRoute) => ({
+                    ...r,
+                    stops: (r.stops || [])
+                        .sort((a: RouteStop, b: RouteStop) => a.stop_order - b.stop_order)
+                        .map((rs: RouteStop) => ({
+                            ...rs,
+                            stop: stops.find(s => s.id === rs.stop_id)
+                        }))
+                })) as BusRoute[];
+                set({ routes, stops });
+            }
+        } catch (error) {
+            console.error('Error initializing web data:', error);
+        }
+    },
 
     // Search function
     searchRoutes: (from: string, to: string) => {

@@ -6,14 +6,10 @@ import { BusRoute } from '@/lib/types';
 import {
     Bus,
     Search,
-    Filter,
-    MoreVertical,
-    CheckCircle2,
     AlertCircle,
     Trash2,
     Edit3,
-    ChevronLeft,
-    ArrowRightLeft
+    ChevronLeft
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -104,10 +100,10 @@ export default function RouteManagement() {
                     {['all', 'verified', 'pending', 'rejected'].map((s) => (
                         <button
                             key={s}
-                            onClick={() => setStatusFilter(s as any)}
+                            onClick={() => setStatusFilter(s as 'all' | 'verified' | 'pending' | 'rejected')}
                             className={`px-4 py-2 rounded-xl text-xs font-semibold capitalize transition-all ${statusFilter === s
-                                    ? 'bg-slate-700 text-white'
-                                    : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800 border border-slate-700'
+                                ? 'bg-slate-700 text-white'
+                                : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800 border border-slate-700'
                                 }`}
                         >
                             {s}

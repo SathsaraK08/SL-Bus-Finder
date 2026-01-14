@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import dynamic from 'next/dynamic';
 import { SearchPanel } from '@/components/SearchPanel';
 import { RouteCard } from '@/components/RouteCard';
@@ -24,7 +25,11 @@ const RouteMap = dynamic(
 );
 
 export default function Home() {
-  const { searchResults, selectedRoute } = useAppStore();
+  const { searchResults, initializeData } = useAppStore();
+
+  React.useEffect(() => {
+    initializeData();
+  }, [initializeData]);
 
   return (
     <div className="min-h-screen">
@@ -92,7 +97,7 @@ export default function Home() {
               {/* Route cards */}
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                 {searchResults.map((result) => (
-                  <RouteCard key={result.route.id} result={result} />
+                  <RouteCard key={`${result.route.id}-${result.matchedStops.from.id}`} result={result} />
                 ))}
               </div>
 
@@ -187,7 +192,7 @@ export default function Home() {
                 About
               </a>
               <a
-                href="#"
+                href="/contribute"
                 className="text-white/50 hover:text-white transition-colors"
               >
                 Contribute

@@ -16,7 +16,6 @@ export function RouteMap() {
             if (!mapRef.current) return;
 
             const L = (await import('leaflet')).default;
-            await import('leaflet/dist/leaflet.css');
 
             // Fix default marker icons
             delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;

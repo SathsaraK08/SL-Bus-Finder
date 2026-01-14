@@ -67,7 +67,7 @@ serve(async (req) => {
         )
 
         if (context.contribution_id) {
-            const updatePayload: any = {
+            const updatePayload: { admin_comment: string; status?: string } = {
                 admin_comment: JSON.stringify(aiData), // Store full analysis
             }
 
